@@ -79,8 +79,10 @@ export function TerminalPane({ id, isVisible }: { id: string; isVisible: boolean
 
       // Send data to Rust PTY
       term.onData((data) => {
+        // Convert DEL (0x7f) backspace to BS (0x08) for shell compatibility
+        const bytes = data.replace(/\x7f/g, '\x08');
         const encoder = new TextEncoder();
-        invoke('write_pty', { id, data: Array.from(encoder.encode(data)) });
+        invoke('write_pty', { id, data: Array.from(encoder.encode(bytes)) });
       });
 
       // Request PTY spawn

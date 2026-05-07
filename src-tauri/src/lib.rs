@@ -12,6 +12,7 @@ pub fn run() {
       pty::spawn_pty,
       pty::write_pty,
       pty::resize_pty,
+      pty::close_pty,
       pty::get_pty_cwd,
       pty::get_pty_process_name_cmd,
       pty::get_pty_git_branch,

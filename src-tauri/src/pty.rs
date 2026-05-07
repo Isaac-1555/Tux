@@ -214,7 +214,8 @@ pub fn spawn_pty(id: String, rows: u16, cols: u16, app_handle: AppHandle) -> Res
     #[cfg(not(target_os = "windows"))]
     let shell_name = std::env::var("SHELL").unwrap_or_else(|_| "bash".to_string());
 
-    let cmd = CommandBuilder::new(&shell_name);
+    let mut cmd = CommandBuilder::new(&shell_name);
+    cmd.env("TERM", "xterm-256color");
 
     let child = pair.slave.spawn_command(cmd).map_err(|e| e.to_string())?;
     let child_pid = child.process_id();
@@ -380,4 +381,17 @@ pub fn get_pty_git_branch(id: String, state: State<'_, PtyState>) -> Result<Opti
         .get(&id)
         .map(|i| i.git_branch.lock().unwrap().clone())
         .ok_or_else(|| "PTY not found".to_string())
+}
+
+#[tauri::command]
+pub fn close_pty(id: String, state: State<'_, PtyState>) -> Result<(), String> {
+    let mut instances = state.instances.lock().unwrap();
+    if let Some(instance) = instances.remove(&id) {
+        if let Some(pid) = instance.child_pid {
+            let _ = Command::new("kill")
+                .args(["-9", &pid.to_string()])
+                .output();
+        }
+    }
+    Ok(())
 }

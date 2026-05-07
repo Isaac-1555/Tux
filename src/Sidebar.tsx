@@ -1,4 +1,4 @@
-import { Monitor, Folder, GitBranch, Menu, Eye, EyeOff } from 'lucide-react';
+import { Monitor, Folder, GitBranch, Menu, Eye, EyeOff, X } from 'lucide-react';
 import { FileTree } from './FileTree';
 import { GitViewer } from './GitViewer';
 import type { FileNode } from './types';
@@ -13,6 +13,7 @@ interface SidebarProps {
   activeTerminalCwd: string | null;
   onTerminalSelect: (id: string) => void;
   onAddTerminal: () => void;
+  onRemoveTerminal: (id: string) => void;
   explorerTree: FileNode[];
   explorerRoot: string;
   expandedFolders: Set<string>;
@@ -34,6 +35,7 @@ export function Sidebar({
   activeTerminalCwd,
   onTerminalSelect,
   onAddTerminal,
+  onRemoveTerminal,
   explorerTree,
   explorerRoot,
   expandedFolders,
@@ -120,13 +122,22 @@ export function Sidebar({
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
+                  justifyContent: 'space-between',
                   gap: '8px',
                 }}
               >
-                <Monitor size={14} />
-                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {getTerminalDisplayName(t.id)}
+                <span style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden' }}>
+                  <Monitor size={14} />
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {getTerminalDisplayName(t.id)}
+                  </span>
                 </span>
+                <button
+                  onClick={(e) => { e.stopPropagation(); onRemoveTerminal(t.id); }}
+                  style={{ background: 'transparent', border: 'none', color: '#888', cursor: 'pointer', padding: '2px', display: 'flex', borderRadius: '2px' }}
+                >
+                  <X size={14} />
+                </button>
               </div>
             ))}
             <button

@@ -215,6 +215,11 @@ function App() {
 
       const isMod = e.metaKey || e.ctrlKey;
 
+      // Only handle modifier key combos - let other keys pass through to terminal/other handlers
+      if (!isMod) {
+        return;
+      }
+
       // Cmd+T: New terminal
       if (isMod && e.key === 't') {
         e.preventDefault();
@@ -280,7 +285,12 @@ function App() {
     return () => document.removeEventListener('keydown', handleKeyDown, true);
   }, [terminals, editorFile, activeTerminalId, terminalMeta]);
 
-  const removeTerminal = (id: string) => {
+  const removeTerminal = async (id: string) => {
+    try {
+      await invoke('close_pty', { id });
+    } catch (e) {
+      console.error('Failed to close PTY:', e);
+    }
     setTerminals(prev => {
       const newTerminals = prev.filter(t => t.id !== id);
       if (newTerminals.length === 0) {
@@ -360,6 +370,7 @@ function App() {
         activeTerminalCwd={activeTerminalId ? terminalMeta[activeTerminalId]?.cwd ?? null : null}
         onTerminalSelect={setActiveTerminalId}
         onAddTerminal={addTerminal}
+        onRemoveTerminal={removeTerminal}
         explorerTree={explorerTree}
         explorerRoot={explorerRoot}
         expandedFolders={expandedFolders}
