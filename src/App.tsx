@@ -270,6 +270,7 @@ function App() {
         onTabChange={setSidebarTab}
         terminals={terminals}
         activeTerminalId={activeTerminalId}
+        activeTerminalCwd={activeTerminalId ? terminalMeta[activeTerminalId]?.cwd ?? null : null}
         onTerminalSelect={setActiveTerminalId}
         onAddTerminal={addTerminal}
         explorerTree={explorerTree}

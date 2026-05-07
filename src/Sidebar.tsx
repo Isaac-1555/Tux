@@ -10,6 +10,7 @@ interface SidebarProps {
   onTabChange: (tab: 'terminals' | 'explorer' | 'git') => void;
   terminals: { id: string }[];
   activeTerminalId: string | null;
+  activeTerminalCwd: string | null;
   onTerminalSelect: (id: string) => void;
   onAddTerminal: () => void;
   explorerTree: FileNode[];
@@ -30,6 +31,7 @@ export function Sidebar({
   onTabChange,
   terminals,
   activeTerminalId,
+  activeTerminalCwd,
   onTerminalSelect,
   onAddTerminal,
   explorerTree,
@@ -164,7 +166,7 @@ export function Sidebar({
         )}
 
         {activeTab === 'git' && (
-          <GitViewer path="." />
+          <GitViewer path={activeTerminalCwd || "."} />
         )}
       </div>
     </div>
