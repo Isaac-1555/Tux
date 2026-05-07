@@ -96,7 +96,7 @@ export function TerminalPane({ id, isVisible }: { id: string; isVisible: boolean
               if (links) {
                 const wrapped = links.map((link) => ({
                   ...link,
-                  activate(event: MouseEvent) {
+                  activate(_event: MouseEvent) {
                     // Open URL in default browser via Tauri
                     open(link.text).catch((e: any) => console.error('Failed to open URL:', e));
                   },

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { load } from '@tauri-apps/plugin-store';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
@@ -9,15 +9,6 @@ import type { FileNode, GitFileStatus } from './types';
 import './App.css';
 
 let storeInstance: any = null;
-
-// CLI coding agents to detect
-const AGENT_PROCESS_NAMES = new Set([
-  'opencode', 'claude', 'codex', 'aider', 'cursor', 'windsurf'
-]);
-
-function isAgentProcess(processName: string): boolean {
-  return AGENT_PROCESS_NAMES.has(processName.toLowerCase());
-}
 
 function App() {
   const [loaded, setLoaded] = useState(false);
@@ -36,6 +27,37 @@ function App() {
 
   // Terminal metadata: { cwd, processName, gitBranch }
   const [terminalMeta, setTerminalMeta] = useState<Record<string, { cwd: string; processName: string; gitBranch: string | null }>>({});
+
+  // Resizable split: fraction of width for the left (editor) pane
+  const [splitRatio, setSplitRatio] = useState(0.5);
+  const splitContainerRef = useRef<HTMLDivElement>(null);
+  const isDraggingRef = useRef(false);
+
+  const handleSplitMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    isDraggingRef.current = true;
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+
+    const onMouseMove = (ev: MouseEvent) => {
+      if (!isDraggingRef.current || !splitContainerRef.current) return;
+      const rect = splitContainerRef.current.getBoundingClientRect();
+      let ratio = (ev.clientX - rect.left) / rect.width;
+      ratio = Math.max(0.15, Math.min(0.85, ratio));
+      setSplitRatio(ratio);
+    };
+
+    const onMouseUp = () => {
+      isDraggingRef.current = false;
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+    };
+
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+  }, []);
 
   // Load initial state
   useEffect(() => {
@@ -237,9 +259,6 @@ function App() {
     });
   };
 
-  // Determine if active terminal is a coding agent
-  const activeIsAgent = activeTerminalId ? isAgentProcess(terminalMeta[activeTerminalId]?.processName ?? '') : false;
-
   if (!loaded) return <div style={{ color: '#fff', padding: '20px' }}>Loading workspace...</div>;
 
   return (
@@ -264,44 +283,48 @@ function App() {
         onToggleHiddenFiles={() => setShowHiddenFiles(prev => !prev)}
       />
 
-      {/* Main Content */}
+      {/* Main Content - unified structure to prevent terminal remounting */}
       <div style={{ flex: 1, overflow: 'hidden' }}>
-        {editorFile ? (
-          // Editor is open
-          activeIsAgent ? (
-            // Agent + Editor: 50/50 split
-            <div style={{ display: 'flex', height: '100%', overflow: 'hidden' }}>
-              <div style={{ flex: 1, overflow: 'hidden', minHeight: 0, borderRight: '1px solid #333' }}>
-                <EditorPane filePath={editorFile} onClose={closeEditor} />
-              </div>
-              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
-                {terminals.map(t => (
-                  <div
-                    key={t.id}
-                    style={{
-                      flex: t.id === activeTerminalId ? 1 : 0,
-                      display: t.id === activeTerminalId ? 'flex' : 'none',
-                      flexDirection: 'column',
-                      height: '100%',
-                      minHeight: 0,
-                      overflow: 'hidden',
-                    }}
-                  >
-                    <TerminalHeader id={t.id} onRemove={removeTerminal} meta={terminalMeta[t.id]} />
-                    <div style={{ flex: 1, position: 'relative', minHeight: 0, overflow: 'hidden' }}>
-                      <TerminalPane id={t.id} isVisible={t.id === activeTerminalId} />
-                    </div>
-                  </div>
-                ))}
-              </div>
+        <div ref={splitContainerRef} style={{ display: 'flex', height: '100%', overflow: 'hidden' }}>
+          {/* Editor pane - show/hide with CSS to avoid unmounting terminals */}
+          <div style={{
+            width: editorFile ? `${splitRatio * 100}%` : '0%',
+            overflow: 'hidden',
+            minWidth: 0,
+            display: 'flex',
+            flexDirection: 'column',
+            flexShrink: 0,
+            transition: 'width 0.1s ease',
+          }}>
+            {editorFile && <EditorPane filePath={editorFile} onClose={closeEditor} />}
+          </div>
+
+          {/* Drag handle - only show when editor is open */}
+          {editorFile && (
+            <div
+              onMouseDown={handleSplitMouseDown}
+              style={{
+                width: '5px',
+                cursor: 'col-resize',
+                backgroundColor: '#252526',
+                flexShrink: 0,
+                position: 'relative',
+                zIndex: 10,
+              }}
+            >
+              <div style={{
+                position: 'absolute',
+                top: 0,
+                bottom: 0,
+                left: '50%',
+                width: '1px',
+                backgroundColor: '#333',
+              }} />
             </div>
-          ) : (
-            // Editor only (no agent)
-            <EditorPane filePath={editorFile} onClose={closeEditor} />
-          )
-        ) : (
-          // No editor: terminal(s) full width
-          <div style={{ display: 'flex', height: '100%', overflow: 'hidden' }}>
+          )}
+
+          {/* Terminal pane - always in same position in the tree */}
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, overflow: 'hidden' }}>
             {terminals.map(t => (
               <div
                 key={t.id}
@@ -312,7 +335,6 @@ function App() {
                   height: '100%',
                   minHeight: 0,
                   overflow: 'hidden',
-                  borderRight: '1px solid #333',
                 }}
               >
                 <TerminalHeader id={t.id} onRemove={removeTerminal} meta={terminalMeta[t.id]} />
@@ -322,7 +344,7 @@ function App() {
               </div>
             ))}
           </div>
-        )}
+        </div>
       </div>
     </div>
   );

@@ -117,9 +117,9 @@ fn get_foreground_process_name(shell_pid: u32) -> Option<String> {
         return None;
     }
     
-    // Get the process name via ps
+    // Get the full command line via ps args
     let output = Command::new("ps")
-        .args(["-o", "comm=", "-p", &current_pid.to_string()])
+        .args(["-o", "args=", "-p", &current_pid.to_string()])
         .output()
         .ok()?;
     
@@ -127,13 +127,39 @@ fn get_foreground_process_name(shell_pid: u32) -> Option<String> {
         return None;
     }
     
-    let name = String::from_utf8_lossy(&output.stdout).trim().to_string();
-    if name.is_empty() {
+    let args_str = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    if args_str.is_empty() {
         return None;
     }
     
-    // Extract just the binary name (strip path)
-    let basename = name.rsplit('/').next().unwrap_or(&name).to_string();
+    // Parse the command line
+    // For "node /path/to/opencode", extract "opencode"
+    // For regular commands, extract the basename
+    let parts: Vec<&str> = args_str.split_whitespace().collect();
+    if parts.is_empty() {
+        return None;
+    }
+    
+    let cmd = parts[0];
+    
+    // Handle node scripts
+    if cmd.ends_with("node") || cmd.ends_with("/node") {
+        // Find the script argument (first non-flag argument after node)
+        for part in &parts[1..] {
+            if !part.starts_with('-') {
+                // Extract basename from script path
+                let name = part.rsplit('/').next().unwrap_or(part);
+                // Strip .js extension if present
+                let name = name.strip_suffix(".js").unwrap_or(name);
+                return Some(name.to_string());
+            }
+        }
+        // No script found, just return "node"
+        return Some("node".to_string());
+    }
+    
+    // For other commands, return basename
+    let basename = cmd.rsplit('/').next().unwrap_or(cmd).to_string();
     Some(basename)
 }
 
