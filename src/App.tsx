@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { load } from '@tauri-apps/plugin-store';
 import { invoke } from '@tauri-apps/api/core';
+import { listen } from '@tauri-apps/api/event';
 import { TerminalPane } from './TerminalPane';
 import { EditorPane } from './EditorPane';
 import { Sidebar } from './Sidebar';
@@ -8,6 +9,15 @@ import type { FileNode, GitFileStatus } from './types';
 import './App.css';
 
 let storeInstance: any = null;
+
+// CLI coding agents to detect
+const AGENT_PROCESS_NAMES = new Set([
+  'opencode', 'claude', 'codex', 'aider', 'cursor', 'windsurf'
+]);
+
+function isAgentProcess(processName: string): boolean {
+  return AGENT_PROCESS_NAMES.has(processName.toLowerCase());
+}
 
 function App() {
   const [loaded, setLoaded] = useState(false);
@@ -19,8 +29,13 @@ function App() {
   const [sidebarTab, setSidebarTab] = useState<'terminals' | 'explorer' | 'git'>('terminals');
 
   const [explorerTree, setExplorerTree] = useState<FileNode[]>([]);
+  const [explorerRoot, setExplorerRoot] = useState<string>('/Users/user');
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
   const [gitStatus, setGitStatus] = useState<Record<string, string>>({});
+  const [showHiddenFiles, setShowHiddenFiles] = useState(false);
+
+  // Terminal metadata: { cwd, processName, gitBranch }
+  const [terminalMeta, setTerminalMeta] = useState<Record<string, { cwd: string; processName: string; gitBranch: string | null }>>({});
 
   // Load initial state
   useEffect(() => {
@@ -45,9 +60,9 @@ function App() {
         setActiveTerminalId(newTerm.id);
       }
 
-      // Load explorer tree (root level)
+      // Load explorer tree (default /Users/user)
       try {
-        const res = await invoke<FileNode[]>('read_dir', { path: '.' });
+        const res = await invoke<FileNode[]>('read_dir', { path: '/Users/user' });
         setExplorerTree(res);
       } catch (e) {
         console.error("Failed to read dir", e);
@@ -71,6 +86,85 @@ function App() {
     }
     loadState();
   }, []);
+
+  // Listen for CWD changes + meta changes from backend
+  useEffect(() => {
+    if (!loaded) return;
+
+    const unlistens: (() => void)[] = [];
+
+    terminals.forEach((t) => {
+      // CWD changed
+      const u1 = listen<string>(`pty-cwd-changed-${t.id}`, (event) => {
+        const newCwd = event.payload;
+        setTerminalMeta((prev) => ({
+          ...prev,
+          [t.id]: { ...prev[t.id], cwd: newCwd, processName: prev[t.id]?.processName ?? 'shell', gitBranch: prev[t.id]?.gitBranch ?? null },
+        }));
+        // If this is the active terminal, update explorer root and tree
+        if (t.id === activeTerminalId) {
+          setExplorerRoot(newCwd);
+          setExpandedFolders(new Set());
+          invoke<FileNode[]>('read_dir', { path: newCwd }).then(setExplorerTree).catch(console.error);
+          // Update git status for new directory
+          invoke<GitFileStatus[]>('get_git_status', { path: newCwd })
+            .then(gitRes => {
+              const statusMap: Record<string, string> = {};
+              for (const status of gitRes) {
+                const parts = status.path.split('/');
+                statusMap[parts[parts.length - 1]] = status.status;
+              }
+              setGitStatus(statusMap);
+            })
+            .catch(() => setGitStatus({}));
+        }
+      });
+      unlistens.push(() => { u1.then(u => u()); });
+
+      // Meta changed (process name, git branch)
+      const u2 = listen(`pty-meta-changed-${t.id}`, async () => {
+        try {
+          const [name, branch] = await Promise.all([
+            invoke<string>('get_pty_process_name_cmd', { id: t.id }),
+            invoke<null | string>('get_pty_git_branch', { id: t.id }),
+          ]);
+          setTerminalMeta((prev) => ({
+            ...prev,
+            [t.id]: { ...prev[t.id], processName: name, gitBranch: branch, cwd: prev[t.id]?.cwd ?? '/Users/user' },
+          }));
+        } catch (e) {
+          console.error("Failed to fetch meta for", t.id, e);
+        }
+      });
+      unlistens.push(() => { u2.then(u => u()); });
+    });
+
+    // Initial meta fetch for existing terminals
+    terminals.forEach(async (t) => {
+      try {
+        const [cwd, name, branch] = await Promise.all([
+          invoke<string>('get_pty_cwd', { id: t.id }),
+          invoke<string>('get_pty_process_name_cmd', { id: t.id }),
+          invoke<null | string>('get_pty_git_branch', { id: t.id }),
+        ]);
+        setTerminalMeta((prev) => ({
+          ...prev,
+          [t.id]: { cwd, processName: name, gitBranch: branch },
+        }));
+        if (t.id === activeTerminalId) {
+          setExplorerRoot(cwd);
+          setExpandedFolders(new Set());
+          invoke<FileNode[]>('read_dir', { path: cwd }).then(setExplorerTree).catch(console.error);
+        }
+      } catch (e) {
+        console.error("Failed initial meta for", t.id, e);
+      }
+    });
+
+    return () => {
+      unlistens.forEach(u => u());
+    };
+  }, [loaded, terminals, activeTerminalId]);
 
   // Save terminals state
   useEffect(() => {
@@ -99,6 +193,12 @@ function App() {
       }
       return newTerminals;
     });
+    // Clean up meta
+    setTerminalMeta(prev => {
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
   };
 
   const openFile = (path: string) => {
@@ -116,7 +216,6 @@ function App() {
         newSet.delete(path);
       } else {
         newSet.add(path);
-        // Lazy load children
         invoke<FileNode[]>('read_dir', { path }).then(children => {
           setExplorerTree(prevTree => updateTreeChildren(prevTree, path, children));
         }).catch(e => console.error("Failed to load folder", e));
@@ -138,6 +237,9 @@ function App() {
     });
   };
 
+  // Determine if active terminal is a coding agent
+  const activeIsAgent = activeTerminalId ? isAgentProcess(terminalMeta[activeTerminalId]?.processName ?? '') : false;
+
   if (!loaded) return <div style={{ color: '#fff', padding: '20px' }}>Loading workspace...</div>;
 
   return (
@@ -152,21 +254,54 @@ function App() {
         onTerminalSelect={setActiveTerminalId}
         onAddTerminal={addTerminal}
         explorerTree={explorerTree}
+        explorerRoot={explorerRoot}
         expandedFolders={expandedFolders}
         onToggleFolder={handleToggleFolder}
         onFileClick={openFile}
         gitStatus={gitStatus}
+        terminalMeta={terminalMeta}
+        showHiddenFiles={showHiddenFiles}
+        onToggleHiddenFiles={() => setShowHiddenFiles(prev => !prev)}
       />
 
       {/* Main Content */}
       <div style={{ flex: 1, overflow: 'hidden' }}>
         {editorFile ? (
-          <EditorPane
-            filePath={editorFile}
-            onClose={closeEditor}
-          />
+          // Editor is open
+          activeIsAgent ? (
+            // Agent + Editor: 50/50 split
+            <div style={{ display: 'flex', height: '100%', overflow: 'hidden' }}>
+              <div style={{ flex: 1, overflow: 'hidden', minHeight: 0, borderRight: '1px solid #333' }}>
+                <EditorPane filePath={editorFile} onClose={closeEditor} />
+              </div>
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
+                {terminals.map(t => (
+                  <div
+                    key={t.id}
+                    style={{
+                      flex: t.id === activeTerminalId ? 1 : 0,
+                      display: t.id === activeTerminalId ? 'flex' : 'none',
+                      flexDirection: 'column',
+                      height: '100%',
+                      minHeight: 0,
+                      overflow: 'hidden',
+                    }}
+                  >
+                    <TerminalHeader id={t.id} onRemove={removeTerminal} meta={terminalMeta[t.id]} />
+                    <div style={{ flex: 1, position: 'relative', minHeight: 0, overflow: 'hidden' }}>
+                      <TerminalPane id={t.id} isVisible={t.id === activeTerminalId} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            // Editor only (no agent)
+            <EditorPane filePath={editorFile} onClose={closeEditor} />
+          )
         ) : (
-          <div style={{ display: 'flex', height: '100%' }}>
+          // No editor: terminal(s) full width
+          <div style={{ display: 'flex', height: '100%', overflow: 'hidden' }}>
             {terminals.map(t => (
               <div
                 key={t.id}
@@ -175,23 +310,32 @@ function App() {
                   display: t.id === activeTerminalId ? 'flex' : 'none',
                   flexDirection: 'column',
                   height: '100%',
+                  minHeight: 0,
+                  overflow: 'hidden',
                   borderRight: '1px solid #333',
                 }}
               >
-                <div style={{ height: '30px', backgroundColor: '#252526', borderBottom: '1px solid #333', display: 'flex', alignItems: 'center', padding: '0 10px', fontSize: '12px', color: '#888', gap: '8px' }}>
-                  <span>Terminal {t.id.slice(-4)}</span>
-                  {terminals.length > 1 && (
-                    <span onClick={() => removeTerminal(t.id)} style={{ marginLeft: 'auto', cursor: 'pointer', color: '#888' }}>×</span>
-                  )}
-                </div>
-                <div style={{ flex: 1, position: 'relative' }}>
-                  <TerminalPane id={t.id} />
+                <TerminalHeader id={t.id} onRemove={removeTerminal} meta={terminalMeta[t.id]} />
+                <div style={{ flex: 1, position: 'relative', minHeight: 0, overflow: 'hidden' }}>
+                  <TerminalPane id={t.id} isVisible={t.id === activeTerminalId} />
                 </div>
               </div>
             ))}
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+// Terminal header with contextual name
+function TerminalHeader({ id, onRemove, meta }: { id: string; onRemove: (id: string) => void; meta?: { processName: string; gitBranch: string | null } }) {
+  const displayName = meta ? (meta.gitBranch ? `${meta.processName} · ${meta.gitBranch}` : meta.processName) : `Terminal ${id.slice(-4)}`;
+
+  return (
+    <div style={{ height: '30px', backgroundColor: '#252526', borderBottom: '1px solid #333', display: 'flex', alignItems: 'center', padding: '0 10px', fontSize: '12px', color: '#888', gap: '8px' }}>
+      <span>{displayName}</span>
+      <button onClick={() => onRemove(id)} style={{ marginLeft: 'auto', cursor: 'pointer', background: 'transparent', border: 'none', color: '#888', fontSize: '14px' }}>×</button>
     </div>
   );
 }

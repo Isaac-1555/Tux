@@ -1,4 +1,3 @@
-
 import { ChevronRight, ChevronDown, Folder, FolderOpen, File } from 'lucide-react';
 import type { FileNode } from './types';
 
@@ -8,10 +7,16 @@ interface FileTreeProps {
   onToggle: (path: string) => void;
   onFileClick: (path: string) => void;
   gitStatus: Record<string, string>;
+  showHiddenFiles?: boolean;
 }
 
-export function FileTree({ nodes, expandedFolders, onToggle, onFileClick, gitStatus }: FileTreeProps) {
+export function FileTree({ nodes, expandedFolders, onToggle, onFileClick, gitStatus, showHiddenFiles = false }: FileTreeProps) {
   const renderNode = (node: FileNode, depth: number = 0) => {
+    // Skip hidden files if showHiddenFiles is false
+    if (!showHiddenFiles && node.name.startsWith('.')) {
+      return null;
+    }
+
     const isExpanded = expandedFolders.has(node.path);
     const status = gitStatus[node.name];
     const statusColor = status === 'Added' ? '#73c991' : status === 'Modified' ? '#e2c08d' : status === 'Deleted' ? '#f14c4c' : '#d4d4d4';
@@ -76,5 +81,8 @@ export function FileTree({ nodes, expandedFolders, onToggle, onFileClick, gitSta
     );
   };
 
-  return <div style={{ padding: '4px 0' }}>{nodes.map(node => renderNode(node))}</div>;
+  // Filter root level nodes if needed
+  const filteredNodes = showHiddenFiles ? nodes : nodes.filter(node => !node.name.startsWith('.'));
+
+  return <div style={{ padding: '4px 0' }}>{filteredNodes.map(node => renderNode(node))}</div>;
 }

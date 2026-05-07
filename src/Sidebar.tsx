@@ -1,5 +1,4 @@
-
-import { Monitor, Folder, GitBranch, Menu } from 'lucide-react';
+import { Monitor, Folder, GitBranch, Menu, Eye, EyeOff } from 'lucide-react';
 import { FileTree } from './FileTree';
 import { GitViewer } from './GitViewer';
 import type { FileNode } from './types';
@@ -14,10 +13,14 @@ interface SidebarProps {
   onTerminalSelect: (id: string) => void;
   onAddTerminal: () => void;
   explorerTree: FileNode[];
+  explorerRoot: string;
   expandedFolders: Set<string>;
   onToggleFolder: (path: string) => void;
   onFileClick: (path: string) => void;
   gitStatus: Record<string, string>;
+  terminalMeta: Record<string, { cwd: string; processName: string; gitBranch: string | null }>;
+  showHiddenFiles: boolean;
+  onToggleHiddenFiles: () => void;
 }
 
 export function Sidebar({
@@ -30,11 +33,23 @@ export function Sidebar({
   onTerminalSelect,
   onAddTerminal,
   explorerTree,
+  explorerRoot,
   expandedFolders,
   onToggleFolder,
   onFileClick,
   gitStatus,
+  terminalMeta,
+  showHiddenFiles,
+  onToggleHiddenFiles,
 }: SidebarProps) {
+  const getTerminalDisplayName = (id: string): string => {
+    const meta = terminalMeta[id];
+    if (meta) {
+      return meta.gitBranch ? `${meta.processName} · ${meta.gitBranch}` : meta.processName;
+    }
+    return `Terminal ${id.slice(-4)}`;
+  };
+
   if (!open) {
     return (
       <div style={{ width: '40px', backgroundColor: '#181818', borderRight: '1px solid #333', display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: '8px' }}>
@@ -108,7 +123,7 @@ export function Sidebar({
               >
                 <Monitor size={14} />
                 <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  Terminal {t.id.slice(-4)}
+                  {getTerminalDisplayName(t.id)}
                 </span>
               </div>
             ))}
@@ -123,13 +138,27 @@ export function Sidebar({
 
         {activeTab === 'explorer' && (
           <div style={{ padding: '10px' }}>
-            <div style={{ fontSize: '11px', textTransform: 'uppercase', color: '#666', marginBottom: '8px', letterSpacing: '0.5px' }}>Explorer</div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+              <div style={{ fontSize: '11px', textTransform: 'uppercase', color: '#666', letterSpacing: '0.5px' }}>Explorer</div>
+              <button
+                onClick={onToggleHiddenFiles}
+                style={{ background: 'transparent', border: 'none', color: showHiddenFiles ? '#5865f2' : '#666', cursor: 'pointer', padding: '2px' }}
+                title={showHiddenFiles ? 'Hide hidden files' : 'Show hidden files'}
+              >
+                {showHiddenFiles ? <Eye size={14} /> : <EyeOff size={14} />}
+              </button>
+            </div>
+            <div style={{ fontSize: '11px', color: '#888', marginBottom: '8px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={explorerRoot}>
+              {explorerRoot.split('/').pop() || explorerRoot}
+              <span style={{ color: '#555', marginLeft: '4px' }}>{explorerRoot}</span>
+            </div>
             <FileTree
               nodes={explorerTree}
               expandedFolders={expandedFolders}
               onToggle={onToggleFolder}
               onFileClick={onFileClick}
               gitStatus={gitStatus}
+              showHiddenFiles={showHiddenFiles}
             />
           </div>
         )}
