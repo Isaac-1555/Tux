@@ -4,6 +4,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { TerminalPane } from './TerminalPane';
 import { EditorPane } from './EditorPane';
+import { DiffPane } from './DiffPane';
 import { Sidebar } from './Sidebar';
 import type { FileNode, GitFileStatus } from './types';
 import './App.css';
@@ -31,6 +32,7 @@ function App() {
   // Resizable split: fraction of width for the left (editor) pane
   const [splitRatio, setSplitRatio] = useState(0.5);
   const splitContainerRef = useRef<HTMLDivElement>(null);
+  const [diffFile, setDiffFile] = useState<string | null>(null);
   const isDraggingRef = useRef(false);
 
   const handleSplitMouseDown = useCallback((e: React.MouseEvent) => {
@@ -202,6 +204,82 @@ function App() {
     setActiveTerminalId(newTerm.id);
   };
 
+  // Global keyboard shortcuts - use capture phase to work even when terminal has focus
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignore if user is in an input/textarea (except for terminal which captures differently)
+      const target = e.target as HTMLElement;
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') {
+        return;
+      }
+
+      const isMod = e.metaKey || e.ctrlKey;
+
+      // Cmd+T: New terminal
+      if (isMod && e.key === 't') {
+        e.preventDefault();
+        addTerminal();
+        return;
+      }
+
+      // Cmd+B: Toggle sidebar
+      if (isMod && e.key === 'b') {
+        e.preventDefault();
+        setSidebarOpen(prev => !prev);
+        return;
+      }
+
+      // Cmd+Q/W/E: Switch sidebar tabs
+      if (isMod && e.key === 'q') {
+        e.preventDefault();
+        setSidebarTab('terminals');
+        return;
+      }
+      if (isMod && e.key === 'w') {
+        e.preventDefault();
+        setSidebarTab('explorer');
+        return;
+      }
+      if (isMod && e.key === 'e') {
+        e.preventDefault();
+        setSidebarTab('git');
+        return;
+      }
+
+      // Cmd+1/2/3: Switch between first 3 terminal sessions
+      if (isMod && e.key === '1' && terminals.length >= 1) {
+        e.preventDefault();
+        setActiveTerminalId(terminals[0].id);
+        return;
+      }
+      if (isMod && e.key === '2' && terminals.length >= 2) {
+        e.preventDefault();
+        setActiveTerminalId(terminals[1].id);
+        return;
+      }
+      if (isMod && e.key === '3' && terminals.length >= 3) {
+        e.preventDefault();
+        setActiveTerminalId(terminals[2].id);
+        return;
+      }
+
+      // Cmd+D: View diff - works even without file open (shows git diff for cwd)
+      if (isMod && e.key === 'd') {
+        e.preventDefault();
+        const cwd = activeTerminalId ? terminalMeta[activeTerminalId]?.cwd : null;
+        if (cwd) {
+          // Toggle between diff view and no diff using the actual cwd path
+          setDiffFile(prev => prev === cwd ? null : cwd);
+        }
+        return;
+      }
+    };
+
+    // Use capture phase to intercept events before terminal/other elements
+    document.addEventListener('keydown', handleKeyDown, true);
+    return () => document.removeEventListener('keydown', handleKeyDown, true);
+  }, [terminals, editorFile, activeTerminalId, terminalMeta]);
+
   const removeTerminal = (id: string) => {
     setTerminals(prev => {
       const newTerminals = prev.filter(t => t.id !== id);
@@ -229,6 +307,11 @@ function App() {
 
   const closeEditor = () => {
     setEditorFile(null);
+    setDiffFile(null);
+  };
+
+  const closeDiff = () => {
+    setDiffFile(null);
   };
 
   const handleToggleFolder = async (path: string) => {
@@ -259,7 +342,11 @@ function App() {
     });
   };
 
-  if (!loaded) return <div style={{ color: '#fff', padding: '20px' }}>Loading workspace...</div>;
+  if (!loaded) {
+    return (
+      <div style={{ color: '#fff', padding: '20px' }}>Loading workspace...</div>
+    );
+  }
 
   return (
     <div style={{ display: 'flex', height: '100vh', width: '100vw', backgroundColor: '#1e1e1e' }}>
@@ -289,7 +376,7 @@ function App() {
         <div ref={splitContainerRef} style={{ display: 'flex', height: '100%', overflow: 'hidden' }}>
           {/* Editor pane - show/hide with CSS to avoid unmounting terminals */}
           <div style={{
-            width: editorFile ? `${splitRatio * 100}%` : '0%',
+            width: editorFile ? (diffFile ? '50%' : `${splitRatio * 100}%`) : (diffFile ? '50%' : '0%'),
             overflow: 'hidden',
             minWidth: 0,
             display: 'flex',
@@ -297,11 +384,53 @@ function App() {
             flexShrink: 0,
             transition: 'width 0.1s ease',
           }}>
-            {editorFile && <EditorPane filePath={editorFile} onClose={closeEditor} />}
+            {editorFile ? (
+              <EditorPane filePath={editorFile} onClose={closeEditor} />
+            ) : diffFile ? (
+              <DiffPane filePath={diffFile} onClose={closeDiff} />
+            ) : null}
           </div>
 
-          {/* Drag handle - only show when editor is open */}
-          {editorFile && (
+          {/* Diff pane - show when both editorFile and diffFile are set */}
+          {diffFile && editorFile && (
+            <>
+              {/* Drag handle between editor and diff */}
+              <div
+                onMouseDown={handleSplitMouseDown}
+                style={{
+                  width: '5px',
+                  cursor: 'col-resize',
+                  backgroundColor: '#252526',
+                  flexShrink: 0,
+                  position: 'relative',
+                  zIndex: 10,
+                }}
+              >
+                <div style={{
+                  position: 'absolute',
+                  top: 0,
+                  bottom: 0,
+                  left: '50%',
+                  width: '1px',
+                  backgroundColor: '#333',
+                }} />
+              </div>
+              
+              <div style={{
+                width: '50%',
+                overflow: 'hidden',
+                minWidth: 0,
+                display: 'flex',
+                flexDirection: 'column',
+                flexShrink: 0,
+              }}>
+                <DiffPane filePath={diffFile} onClose={closeDiff} />
+              </div>
+            </>
+          )}
+
+          {/* Drag handle - only show when editor is open and no diff */}
+          {editorFile && !diffFile && (
             <div
               onMouseDown={handleSplitMouseDown}
               style={{

@@ -11,3 +11,80 @@ body, html, #root {
   color: #fff;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 }
+
+:root {
+  --diff-background-color: #1e1e1e;
+  --diff-text-color: #d4d4d4;
+  --diff-font-family: ui-monospace, Consolas, monospace;
+  --diff-selection-background-color: rgba(56, 139, 253, 0.25);
+  --diff-selection-text-color: #d4d4d4;
+  --diff-gutter-insert-background-color: rgba(46, 160, 67, 0.2);
+  --diff-gutter-insert-text-color: #2ea043;
+  --diff-gutter-delete-background-color: rgba(248, 81, 73, 0.2);
+  --diff-gutter-delete-text-color: #f85149;
+  --diff-gutter-selected-background-color: rgba(56, 139, 253, 0.15);
+  --diff-gutter-selected-text-color: #d4d4d4;
+  --diff-code-insert-background-color: rgba(46, 160, 67, 0.15);
+  --diff-code-insert-text-color: #2ea043;
+  --diff-code-delete-background-color: rgba(248, 81, 73, 0.15);
+  --diff-code-delete-text-color: #f85149;
+  --diff-code-insert-edit-background-color: rgba(46, 160, 67, 0.4);
+  --diff-code-insert-edit-text-color: #2ea043;
+  --diff-code-delete-edit-background-color: rgba(248, 81, 73, 0.4);
+  --diff-code-delete-edit-text-color: #f85149;
+  --diff-code-selected-background-color: rgba(56, 139, 253, 0.15);
+  --diff-code-selected-text-color: #d4d4d4;
+  --diff-omit-gutter-line-color: #cb2a1d;
+}
+
+.diff {
+  font-family: var(--diff-font-family) !important;
+  background-color: var(--diff-background-color) !important;
+}
+
+.diff td {
+  color: var(--diff-text-color) !important;
+}
+
+.diff-code-insert {
+  background-color: var(--diff-code-insert-background-color) !important;
+  color: var(--diff-code-insert-text-color) !important;
+}
+
+.diff-code-delete {
+  background-color: var(--diff-code-delete-background-color) !important;
+  color: var(--diff-code-delete-text-color) !important;
+}
+
+.diff-gutter-insert {
+  background-color: var(--diff-gutter-insert-background-color) !important;
+  color: var(--diff-gutter-insert-text-color) !important;
+}
+
+.diff-gutter-delete {
+  background-color: var(--diff-gutter-delete-background-color) !important;
+  color: var(--diff-gutter-delete-text-color) !important;
+}
+
+.diff-dark .diff {
+  background-color: #1e1e1e !important;
+}
+
+.diff-dark .diff td {
+  color: #d4d4d4 !important;
+  font-family: ui-monospace, Consolas, monospace !important;
+}
+
+.diff-dark .diff-code {
+  color: #d4d4d4 !important;
+}
+
+.diff-dark .diff-gutter {
+  color: #6e7681 !important;
+}
+
+.diff-dark .diff-line {
+  font-family: ui-monospace, Consolas, monospace !important;
+  font-size: 13px !important;
+  line-height: 1.5 !important;
+}

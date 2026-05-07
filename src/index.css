@@ -30,6 +30,31 @@
   }
 }
 
+:root {
+  --diff-background-color: #1e1e1e;
+  --diff-text-color: #d4d4d4;
+  --diff-font-family: ui-monospace, Consolas, monospace;
+  --diff-selection-background-color: rgba(56, 139, 253, 0.25);
+  --diff-selection-text-color: #d4d4d4;
+  --diff-gutter-insert-background-color: rgba(46, 160, 67, 0.2);
+  --diff-gutter-insert-text-color: #2ea043;
+  --diff-gutter-delete-background-color: rgba(248, 81, 73, 0.2);
+  --diff-gutter-delete-text-color: #f85149;
+  --diff-gutter-selected-background-color: rgba(56, 139, 253, 0.15);
+  --diff-gutter-selected-text-color: #d4d4d4;
+  --diff-code-insert-background-color: rgba(46, 160, 67, 0.15);
+  --diff-code-insert-text-color: #2ea043;
+  --diff-code-delete-background-color: rgba(248, 81, 73, 0.15);
+  --diff-code-delete-text-color: #f85149;
+  --diff-code-insert-edit-background-color: rgba(46, 160, 67, 0.4);
+  --diff-code-insert-edit-text-color: #2ea043;
+  --diff-code-delete-edit-background-color: rgba(248, 81, 73, 0.4);
+  --diff-code-delete-edit-text-color: #f85149;
+  --diff-code-selected-background-color: rgba(56, 139, 253, 0.15);
+  --diff-code-selected-text-color: #d4d4d4;
+  --diff-omit-gutter-line-color: #cb2a1d;
+}
+
 @media (prefers-color-scheme: dark) {
   :root {
     --text: #9ca3af;
@@ -106,4 +131,29 @@ code {
   line-height: 135%;
   padding: 4px 8px;
   background: var(--code-bg);
+}
+
+:root {
+  --diff-background-color: #1e1e1e;
+  --diff-text-color: #d4d4d4;
+  --diff-font-family: ui-monospace, Consolas, monospace;
+  --diff-selection-background-color: rgba(56, 139, 253, 0.25);
+  --diff-selection-text-color: #d4d4d4;
+  --diff-gutter-insert-background-color: rgba(46, 160, 67, 0.2);
+  --diff-gutter-insert-text-color: #2ea043;
+  --diff-gutter-delete-background-color: rgba(248, 81, 73, 0.2);
+  --diff-gutter-delete-text-color: #f85149;
+  --diff-gutter-selected-background-color: rgba(56, 139, 253, 0.15);
+  --diff-gutter-selected-text-color: #d4d4d4;
+  --diff-code-insert-background-color: rgba(46, 160, 67, 0.15);
+  --diff-code-insert-text-color: #2ea043;
+  --diff-code-delete-background-color: rgba(248, 81, 73, 0.15);
+  --diff-code-delete-text-color: #f85149;
+  --diff-code-insert-edit-background-color: rgba(46, 160, 67, 0.4);
+  --diff-code-insert-edit-text-color: #2ea043;
+  --diff-code-delete-edit-background-color: rgba(248, 81, 73, 0.4);
+  --diff-code-delete-edit-text-color: #f85149;
+  --diff-code-selected-background-color: rgba(56, 139, 253, 0.15);
+  --diff-code-selected-text-color: #d4d4d4;
+  --diff-omit-gutter-line-color: #cb2a1d;
 }

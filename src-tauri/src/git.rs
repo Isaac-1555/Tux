@@ -72,6 +72,67 @@ pub fn get_git_branch(path: String) -> Result<GitBranch, String> {
 }
 
 #[command]
+pub fn get_git_diff(path: String) -> Result<String, String> {
+    // Use git command for proper unified diff - shows both staged and unstaged
+    let output = std::process::Command::new("git")
+        .args(["diff", "HEAD"])  // unstaged
+        .current_dir(&path)
+        .output()
+        .map_err(|e| e.to_string())?;
+    
+    let output2 = std::process::Command::new("git")
+        .args(["diff", "--cached", "HEAD"])  // staged
+        .current_dir(&path)
+        .output()
+        .map_err(|e| e.to_string())?;
+
+    let mut diff_text = String::new();
+    
+    // Add unstaged changes
+    let unstaged = String::from_utf8(output.stdout).map_err(|e| e.to_string())?;
+    if !unstaged.is_empty() {
+        diff_text.push_str(&unstaged);
+    }
+    
+    // Add staged changes
+    let staged = String::from_utf8(output2.stdout).map_err(|e| e.to_string())?;
+    if !staged.is_empty() {
+        if !diff_text.is_empty() {
+            diff_text.push('\n');
+        }
+        diff_text.push_str(&staged);
+    }
+    
+    Ok(diff_text)
+}
+
+#[command]
+pub fn git_show_file(path: String, file_path: String) -> Result<String, String> {
+    let repo = Repository::discover(&path).map_err(|e| e.to_string())?;
+    
+    // Get the head commit
+    let head = repo.head().map_err(|e| e.to_string())?;
+    let head_oid = head.target().ok_or("No HEAD commit")?;
+    
+    // Get the tree from the commit
+    let commit = repo.find_commit(head_oid).map_err(|e| e.to_string())?;
+    let tree = commit.tree().map_err(|e| e.to_string())?;
+    
+    // Try to find the file in the tree
+    let file_path_clean = file_path.trim_start_matches("./");
+    match tree.get_path(std::path::Path::new(file_path_clean)) {
+        Ok(entry) => {
+            let blob = repo.find_blob(entry.id()).map_err(|e| e.to_string())?;
+            Ok(String::from_utf8(blob.content().to_vec()).unwrap_or_default())
+        }
+        Err(_) => {
+            // File doesn't exist in HEAD (new file)
+            Ok(String::new())
+        }
+    }
+}
+
+#[command]
 pub fn get_git_commits(path: String) -> Result<Vec<GitCommit>, String> {
     let repo = Repository::discover(&path).map_err(|e| e.to_string())?;
     let mut revwalk = repo.revwalk().map_err(|e| e.to_string())?;

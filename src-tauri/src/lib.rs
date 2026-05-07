@@ -21,6 +21,8 @@ pub fn run() {
       fs::write_file,
       git::get_git_status,
       git::get_git_branch,
+      git::get_git_diff,
+      git::git_show_file,
       git::get_git_commits,
     ])
     .setup(|app| {

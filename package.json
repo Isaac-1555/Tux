@@ -16,6 +16,7 @@
     "@codemirror/lang-javascript": "^6.2.5",
     "@codemirror/lang-json": "^6.0.2",
     "@codemirror/lang-markdown": "^6.5.0",
+    "@pierre/diffs": "^1.1.20",
     "@tauri-apps/api": "^2.11.0",
     "@tauri-apps/plugin-shell": "^2.3.5",
     "@tauri-apps/plugin-store": "^2.4.3",
