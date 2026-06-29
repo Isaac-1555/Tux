@@ -1,11 +1,11 @@
 # Product Requirements Document (PRD)
 ## Project: Multi-Session Terminal IDE
-### Working Name: “Lite-Mux"
+### Working Name: "Tux"
 ---
 
 # 1. Overview
 
-Lite-Mux is a desktop application built in Rust that combines:
+Tux is a desktop application built in Rust that combines:
 
 - Multi-session terminal management
 - Lightweight code editing

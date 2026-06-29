@@ -12,6 +12,11 @@ dist
 dist-ssr
 *.local
 
+# Build / test artifacts
+src-tauri/target
+.playwright-mcp
+*.png.tmp
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

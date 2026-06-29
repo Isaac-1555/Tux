@@ -1,73 +1,83 @@
-# React + TypeScript + Vite
+# Tux
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A fast, terminal-first desktop workspace combining multi-session terminals, lightweight editing, and git-aware workflows in one compact UI.
 
-Currently, two official plugins are available:
+Tux sits between a traditional terminal emulator and a full IDE — keyboard-driven, native, and built for developers who live in the shell and use AI coding agents.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Status
 
-## React Compiler
+**Early development (v0.1.0).** Functional prototype with sessions, embedded PTY terminal, file explorer, code editor, and git integration. See `PRD.md` for the full product spec.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Features
 
-## Expanding the ESLint configuration
+- **Multi-session terminals** — isolated PTY-backed sessions, each with its own cwd, git context, and foreground process
+- **Resizable split layout** — terminal and editor side-by-side, drag to resize
+- **Lightweight code editor** — CodeMirror 6, syntax highlighting for HTML/CSS/JS/TS/JSON/Markdown
+- **File explorer** — tree view with hidden-file toggle
+- **Git integration** — branch display, changed-files list, diff viewer
+- **Session persistence** — sessions and layout restore on relaunch (via `tauri-plugin-store`)
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+## Stack
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+| Layer | Tech |
+|---|---|
+| Shell | [Tauri](https://tauri.app/) 2.x |
+| Frontend | React 19 + TypeScript + Vite |
+| Editor | CodeMirror 6 (`@uiw/react-codemirror`) |
+| Terminal | Rust `portable-pty` |
+| Git | `git2-rs` |
+| State | Tauri store plugin |
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+## Project Structure
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```
+.
+├── src/                  # React frontend
+│   ├── App.tsx           # Root layout + state
+│   ├── Sidebar.tsx       # Sessions / Explorer / Git tabs
+│   ├── TerminalPane.tsx  # PTY-backed terminal UI
+│   ├── EditorPane.tsx    # CodeMirror editor
+│   ├── DiffPane.tsx      # Git diff viewer
+│   ├── FileTree.tsx
+│   ├── GitViewer.tsx
+│   └── types.ts
+├── src-tauri/            # Rust backend
+│   ├── src/
+│   │   ├── lib.rs        # Tauri builder + command registry
+│   │   ├── pty.rs        # PTY spawn/io/metadata
+│   │   ├── fs.rs         # File system commands
+│   │   └── git.rs        # Git status/branch/diff/log
+│   ├── capabilities/
+│   │   └── default.json  # Tauri permission allowlist
+│   ├── tauri.conf.json   # Bundle config (productName, identifier, window)
+│   └── Cargo.toml
+├── PRD.md                # Full product requirements
+└── AGENTS.md             # Agent-facing project guide
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+## Development
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+Prerequisites: Node 20+, Rust stable (1.77.2+), Tauri CLI deps for your OS ([guide](https://tauri.app/start/prerequisites/)).
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm install
+npm run tauri dev      # Dev: Vite + Rust, hot-reload
 ```
+
+## Build
+
+```bash
+npm run tauri build    # Release .app (macOS) / .msi (Windows) / .AppImage / .deb (Linux)
+```
+
+Artifacts land in `src-tauri/target/release/bundle/`.
+
+## Configuration
+
+- **Bundle identifier:** `dev.tux.app` (`src-tauri/tauri.conf.json`)
+- **Window title:** `Tux`
+- **Tauri capabilities** (plugin permissions): `src-tauri/capabilities/default.json`
+
+## License
+
+Private project. License TBD.
