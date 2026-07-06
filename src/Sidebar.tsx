@@ -68,7 +68,10 @@ export function Sidebar({
     <div style={{ width: '250px', backgroundColor: '#181818', borderRight: '1px solid #333', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       {/* Header with toggle */}
       <div style={{ display: 'flex', alignItems: 'center', padding: '12px 12px 8px 12px', color: '#fff', borderBottom: '1px solid #333' }}>
-        <span style={{ fontWeight: 'bold', flex: 1 }}>Tux</span>
+        <span style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 'bold', flex: 1 }}>
+          <img src="/icon.png" alt="Tux" style={{ width: '20px', height: '20px' }} />
+          Tux
+        </span>
         <button onClick={onToggle} style={{ background: 'transparent', border: 'none', color: '#888', cursor: 'pointer', padding: '4px' }}>
           <Menu size={16} />
         </button>
