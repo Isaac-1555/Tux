@@ -216,6 +216,25 @@ pub fn spawn_pty(id: String, rows: u16, cols: u16, app_handle: AppHandle) -> Res
 
     let mut cmd = CommandBuilder::new(&shell_name);
     cmd.env("TERM", "xterm-256color");
+    // Advertise a capable terminal so TUIs (opencode, claude code, etc.) detect
+    // rich rendering mode. Tux uses xterm.js + image-protocol addon (kitty
+    // TGP, iTerm2 IIP, SIXEL), so claiming "ghostty" lets programs probe
+    // kitty graphics / iTerm2 image protocols that the frontend handles.
+    cmd.env("TERM_PROGRAM", "ghostty");
+    cmd.env("TERM_PROGRAM_VERSION", env!("CARGO_PKG_VERSION"));
+    cmd.env("COLORTERM", "truecolor");
+
+    // UTF-8 locale: inherit from parent if it already specifies UTF-8, else
+    // default to en_US.UTF-8 (always present on macOS). Prevents TUIs from
+    // falling back to ASCII line-drawing when launchd provides no LANG.
+    let utf8_locale = std::env::var("LC_ALL")
+        .or_else(|_| std::env::var("LANG"))
+        .ok()
+        .filter(|v| v.to_uppercase().contains("UTF-8"))
+        .unwrap_or_else(|| "en_US.UTF-8".to_string());
+    cmd.env("LC_ALL", &utf8_locale);
+    cmd.env("LANG", &utf8_locale);
+    cmd.env("LC_CTYPE", &utf8_locale);
 
     let child = pair.slave.spawn_command(cmd).map_err(|e| e.to_string())?;
     let child_pid = child.process_id();
