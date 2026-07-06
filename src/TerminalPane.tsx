@@ -14,6 +14,11 @@ export function TerminalPane({ id, isVisible }: { id: string; isVisible: boolean
   const termRef = useRef<Terminal | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
   const resizeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Generation counter for React 19 StrictMode remount safety. Each effect
+  // run captures `myGen = ++generationRef.current`. After any `await`, check
+  // isStale() — if the effect re-ran (StrictMode dev) or unmounted, bail
+  // without side effects.
+  const generationRef = useRef(0);
 
   const fitTerminal = useCallback(() => {
     if (fitAddonRef.current && termRef.current && containerRef.current) {
@@ -38,22 +43,29 @@ export function TerminalPane({ id, isVisible }: { id: string; isVisible: boolean
   }, [isVisible, fitTerminal]);
 
   useEffect(() => {
-    let unlisten: (() => void) | undefined;
+    const myGen = ++generationRef.current;
+    let unlisten: (() => void) | null = null;
     let mounted = true;
     let resizeObserver: ResizeObserver | null = null;
     let container: HTMLDivElement | null = null;
 
+    function isStale() {
+      return !mounted || myGen !== generationRef.current;
+    }
+
     async function setup() {
-      if (!mounted) return;
+      if (isStale()) return;
 
       const fontFamily = 'Monaco, Menlo, "Courier New", monospace';
       const fontSize = 14;
       await document.fonts.ready;
+      if (isStale()) return;
       try {
         await document.fonts.load(`${fontSize}px ${fontFamily}`);
       } catch (e) {
         console.warn('[TerminalPane] Font preload failed, continuing:', e);
       }
+      if (isStale()) return;
 
       container = containerRef.current;
       if (!container) return;
@@ -121,7 +133,7 @@ export function TerminalPane({ id, isVisible }: { id: string; isVisible: boolean
 
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
-          if (mounted && termRef.current) {
+          if (!isStale() && termRef.current) {
             fitTerminal();
           }
         });
@@ -144,11 +156,21 @@ export function TerminalPane({ id, isVisible }: { id: string; isVisible: boolean
         }
       };
 
-      // Listen for data from Rust PTY
+      // Listen for data from Rust PTY. Assign unlisten as soon as the promise
+      // resolves (not via the later `await`) so cleanup can unsubscribe even
+      // if it runs before that await completes (React 19 StrictMode race).
       const unlistenPromise = listen<number[]>(`pty-data-${id}`, (event) => {
+        if (isStale()) return;
         const u8 = new Uint8Array(event.payload);
         term.write(u8);
       });
+      unlistenPromise.then(u => {
+        if (isStale()) {
+          u(); // unsubscribe if stale — don't leak mount 1's listener
+        } else {
+          unlisten = u;
+        }
+      }).catch(() => { /* listener registration failed; ignore */ });
 
       // Send data to Rust PTY
       term.onData((data) => {
@@ -160,6 +182,12 @@ export function TerminalPane({ id, isVisible }: { id: string; isVisible: boolean
 
       // Request PTY spawn
       await invoke('spawn_pty', { id, rows: term.rows, cols: term.cols });
+
+      // StrictMode guard: if the effect re-ran during the await, the new
+      // mount will spawn its own PTY. We don't close here — calling
+      // close_pty could race-kill the live PTY from the newer mount.
+      // Cleanup is the single source of truth for PTY teardown.
+      if (isStale()) return;
 
       // Handle Resize - only resize when terminal explicitly resizes
       term.onResize(({ cols, rows }) => {
@@ -176,14 +204,15 @@ export function TerminalPane({ id, isVisible }: { id: string; isVisible: boolean
         });
         resizeObserver.observe(containerRef.current);
       }
-
-      unlisten = await unlistenPromise;
     }
 
     setup();
 
     return () => {
       mounted = false;
+      // Kill the PTY this effect spawned (or a leftover from HMR/StrictMode).
+      // Fire-and-forget: invoke is async, cleanup can't await.
+      invoke('close_pty', { id }).catch(() => { /* already closed or never spawned; ignore */ });
       if (resizeTimerRef.current) clearTimeout(resizeTimerRef.current);
       if (resizeObserver) {
         resizeObserver.disconnect();
