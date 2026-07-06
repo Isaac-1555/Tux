@@ -1,5 +1,10 @@
 import { useEffect, useRef, useCallback } from 'react';
-import { init, Terminal, FitAddon, UrlRegexProvider } from 'ghostty-web';
+import { Terminal } from '@xterm/xterm';
+import { FitAddon } from '@xterm/addon-fit';
+import { WebglAddon } from '@xterm/addon-webgl';
+import { ImageAddon } from '@xterm/addon-image';
+import { WebLinksAddon } from '@xterm/addon-web-links';
+import '@xterm/xterm/css/xterm.css';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { open } from '@tauri-apps/plugin-shell';
@@ -17,7 +22,7 @@ export function TerminalPane({ id, isVisible }: { id: string; isVisible: boolean
       if (clientWidth === 0 || clientHeight === 0) return;
       try {
         fitAddonRef.current.fit();
-      } catch (e) {
+      } catch {
         // Ignore fit errors
       }
     }
@@ -36,9 +41,9 @@ export function TerminalPane({ id, isVisible }: { id: string; isVisible: boolean
     let unlisten: (() => void) | undefined;
     let mounted = true;
     let resizeObserver: ResizeObserver | null = null;
+    let container: HTMLDivElement | null = null;
 
     async function setup() {
-      await init();
       if (!mounted) return;
 
       const fontFamily = 'Monaco, Menlo, "Courier New", monospace';
@@ -50,14 +55,19 @@ export function TerminalPane({ id, isVisible }: { id: string; isVisible: boolean
         console.warn('[TerminalPane] Font preload failed, continuing:', e);
       }
 
-      const container = containerRef.current!;
-      const { clientWidth, clientHeight } = container;
+      container = containerRef.current;
+      if (!container) return;
+      const el: HTMLDivElement = container;
+      // Defensive: clear any leftover xterm DOM from a prior mount cycle
+      // (StrictMode remount, hot-reload, etc.) before opening a new terminal.
+      while (el.firstChild) el.removeChild(el.firstChild);
+      const { clientWidth, clientHeight } = el;
       if (clientWidth > 0 && clientHeight > 0) {
-        container.style.width = `${clientWidth}px`;
-        container.style.height = `${clientHeight}px`;
+        el.style.width = `${clientWidth}px`;
+        el.style.height = `${clientHeight}px`;
         requestAnimationFrame(() => {
-          container.style.width = '';
-          container.style.height = '';
+          el.style.width = '';
+          el.style.height = '';
         });
       }
 
@@ -70,59 +80,65 @@ export function TerminalPane({ id, isVisible }: { id: string; isVisible: boolean
         },
       });
 
-      let fitAddon;
-      try {
-        fitAddon = new FitAddon();
-        term.loadAddon(fitAddon);
-        fitAddonRef.current = fitAddon;
-      } catch (e) {
-        console.warn("FitAddon not found", e);
-      }
-
-      term.open(container);
+      term.open(el);
       termRef.current = term;
 
-      const renderer = (term as any).renderer;
-      if (renderer) {
-        const testCanvas = document.createElement('canvas');
-        const ctx = testCanvas.getContext('2d')!;
-        ctx.font = `${fontSize}px ${fontFamily}`;
-        const m = ctx.measureText('M');
-        const width = Math.ceil(m.width);
-        const baselineA = m.actualBoundingBoxAscent;
-        const baselineD = m.actualBoundingBoxDescent;
-        if (baselineA !== undefined && baselineD !== undefined) {
-          renderer.metrics = {
-            width,
-            height: Math.ceil(baselineA + baselineD) + 2,
-            baseline: Math.ceil(baselineA) + 1,
-          };
-        }
-        renderer.resize(term.cols, term.rows);
+      const fitAddon = new FitAddon();
+      term.loadAddon(fitAddon);
+      fitAddonRef.current = fitAddon;
+
+      // WebGL renderer: GPU acceleration + automatic DPR handling for crisp
+      // glyphs on Retina. Falls back to canvas if GPU unavailable.
+      try {
+        const webglAddon = new WebglAddon();
+        webglAddon.onContextLoss(() => {
+          webglAddon.dispose();
+        });
+        term.loadAddon(webglAddon);
+      } catch (e) {
+        console.warn('[TerminalPane] WebGL renderer unavailable, using canvas:', e);
       }
 
-      if (fitAddon) {
-        requestAnimationFrame(() => {
-          requestAnimationFrame(() => {
-            if (mounted && termRef.current) {
-              fitTerminal();
-            }
-          });
-        });
+      // Image protocol support: SIXEL, iTerm2 IIP, kitty TGP. Lets TUIs that
+      // detect terminal image capability (opencode, claude code, etc.) render
+      // inline graphics (logos, diffs, charts) instead of falling back to
+      // ASCII art. Also enables CSI 14/16/18t cell-size reports so programs
+      // can size images correctly.
+      try {
+        term.loadAddon(new ImageAddon());
+      } catch (e) {
+        console.warn('[TerminalPane] Image addon failed to load:', e);
       }
+
+      // URL link handler — opens in default browser via Tauri shell.
+      try {
+        term.loadAddon(new WebLinksAddon((_event, uri) => {
+          open(uri).catch((err) => console.error('Failed to open URL:', err));
+        }));
+      } catch (e) {
+        console.warn('[TerminalPane] Web links addon failed to load:', e);
+      }
+
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          if (mounted && termRef.current) {
+            fitTerminal();
+          }
+        });
+      });
 
       (window as any).__terminalDebug = {
         term,
         getMetrics: () => {
-          const canvas = (term as any).renderer?.getCanvas?.();
-          const metrics = (term as any).renderer?.getMetrics?.();
+          const container = containerRef.current;
+          if (!container) return null;
           return {
             dpr: window.devicePixelRatio,
-            visualScale: (window as any).visualViewport?.scale,
             containerSize: { w: container.clientWidth, h: container.clientHeight },
-            canvasCSS: canvas ? { w: canvas.style.width, h: canvas.style.height } : null,
-            canvasBuffer: canvas ? { w: canvas.width, h: canvas.height } : null,
-            metrics,
+            cols: term.cols,
+            rows: term.rows,
+            fontSize,
+            fontFamily,
             fontStatus: document.fonts.status,
           };
         }
@@ -144,35 +160,6 @@ export function TerminalPane({ id, isVisible }: { id: string; isVisible: boolean
 
       // Request PTY spawn
       await invoke('spawn_pty', { id, rows: term.rows, cols: term.cols });
-
-      // Register URL link provider - opens URLs in default browser on Cmd/Ctrl+click
-      try {
-        const urlProvider = new UrlRegexProvider(term as any);
-        // Wrap the provider to use Tauri shell open instead of window.open
-        term.registerLinkProvider({
-          provideLinks(y: number, callback: (links: any[] | undefined) => void) {
-            urlProvider.provideLinks(y, (links) => {
-              if (links) {
-                const wrapped = links.map((link) => ({
-                  ...link,
-                  activate(_event: MouseEvent) {
-                    // Open URL in default browser via Tauri
-                    open(link.text).catch((e: any) => console.error('Failed to open URL:', e));
-                  },
-                }));
-                callback(wrapped);
-              } else {
-                callback(undefined);
-              }
-            });
-          },
-          dispose() {
-            urlProvider.dispose?.();
-          },
-        });
-      } catch (e) {
-        console.warn('Failed to register URL link provider', e);
-      }
 
       // Handle Resize - only resize when terminal explicitly resizes
       term.onResize(({ cols, rows }) => {
@@ -203,6 +190,16 @@ export function TerminalPane({ id, isVisible }: { id: string; isVisible: boolean
       }
       if (unlisten) unlisten();
       if (termRef.current) termRef.current.dispose();
+      // xterm.js dispose() does not remove its .xterm wrapper + canvases
+      // from the container. React 19 StrictMode remounts the effect in dev,
+      // so without clearing we end up with two stacked terminals.
+      if (container) {
+        while (container.firstChild) {
+          container.removeChild(container.firstChild);
+        }
+      }
+      termRef.current = null;
+      fitAddonRef.current = null;
     };
   }, [id, fitTerminal]);
 
@@ -240,24 +237,15 @@ export function TerminalPane({ id, isVisible }: { id: string; isVisible: boolean
           if (el) {
             const update = () => {
               const container = containerRef.current;
-              if (!container) return;
+              const term = termRef.current;
+              if (!container || !term) return;
               const dpr = window.devicePixelRatio;
-              const testCanvas = document.createElement('canvas');
-              const ctx = testCanvas.getContext('2d')!;
-              ctx.font = '14px Monaco, Menlo, "Courier New", monospace';
-              const m = ctx.measureText('M');
-              const w = ctx.measureText('W').width;
-              const bboxA = m.actualBoundingBoxAscent || 14 * 0.8;
-              const bboxD = m.actualBoundingBoxDescent || 14 * 0.2;
-              const cellH = Math.ceil(bboxA + bboxD) + 2;
               el.textContent = [
                 `DPR:${dpr}`,
                 `cont:${container.clientWidth}×${container.clientHeight}`,
                 `phys:${(container.clientWidth * dpr).toFixed(0)}×${(container.clientHeight * dpr).toFixed(0)}`,
-                `glyph:⌊${w.toFixed(1)}×${cellH}⌋`,
-                `fit.cols:${(container.clientWidth / w).toFixed(1)}`,
-                `fit.rows:${(container.clientHeight / cellH).toFixed(1)}`,
-                `frac:${(container.clientWidth % 1).toFixed(2)}×${(container.clientHeight % 1).toFixed(2)}`,
+                `cols:${term.cols}`,
+                `rows:${term.rows}`,
               ].join(' | ');
             };
             update();
