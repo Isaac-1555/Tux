@@ -1,4 +1,4 @@
-import { Monitor, Folder, GitBranch, Menu, Eye, EyeOff, X } from 'lucide-react';
+import { Monitor, Folder, GitBranch, Menu, Eye, EyeOff, X, Settings } from 'lucide-react';
 import { FileTree } from './FileTree';
 import { GitViewer } from './GitViewer';
 import type { FileNode } from './types';
@@ -23,6 +23,7 @@ interface SidebarProps {
   terminalMeta: Record<string, { cwd: string; processName: string; gitBranch: string | null }>;
   showHiddenFiles: boolean;
   onToggleHiddenFiles: () => void;
+  onOpenSettings?: () => void;
 }
 
 export function Sidebar({
@@ -45,6 +46,7 @@ export function Sidebar({
   terminalMeta,
   showHiddenFiles,
   onToggleHiddenFiles,
+  onOpenSettings,
 }: SidebarProps) {
   const getTerminalDisplayName = (id: string): string => {
     const meta = terminalMeta[id];
@@ -56,10 +58,15 @@ export function Sidebar({
 
   if (!open) {
     return (
-      <div style={{ width: '40px', backgroundColor: '#181818', borderRight: '1px solid #333', display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: '8px' }}>
+      <div style={{ width: '40px', backgroundColor: '#181818', borderRight: '1px solid #333', display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: '8px', gap: '4px' }}>
         <button onClick={onToggle} style={{ background: 'transparent', border: 'none', color: '#888', cursor: 'pointer', padding: '8px' }}>
           <Menu size={18} />
         </button>
+        {onOpenSettings && (
+          <button onClick={onOpenSettings} title="Keyboard Shortcuts" style={{ background: 'transparent', border: 'none', color: '#888', cursor: 'pointer', padding: '8px' }}>
+            <Settings size={18} />
+          </button>
+        )}
       </div>
     );
   }
@@ -72,7 +79,12 @@ export function Sidebar({
           <img src="/icon.png" alt="Tux" style={{ width: '20px', height: '20px' }} />
           Tux
         </span>
-        <button onClick={onToggle} style={{ background: 'transparent', border: 'none', color: '#888', cursor: 'pointer', padding: '4px' }}>
+        {onOpenSettings && (
+          <button onClick={onOpenSettings} title="Keyboard Shortcuts" style={{ background: 'transparent', border: 'none', color: '#888', cursor: 'pointer', padding: '4px', display: 'inline-flex', alignItems: 'center' }}>
+            <Settings size={16} />
+          </button>
+        )}
+        <button onClick={onToggle} style={{ background: 'transparent', border: 'none', color: '#888', cursor: 'pointer', padding: '4px', display: 'inline-flex', alignItems: 'center' }}>
           <Menu size={16} />
         </button>
       </div>

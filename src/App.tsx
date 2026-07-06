@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { load } from '@tauri-apps/plugin-store';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
@@ -6,6 +6,13 @@ import { TerminalPane } from './TerminalPane';
 import { EditorPane } from './EditorPane';
 import { DiffPane } from './DiffPane';
 import { Sidebar } from './Sidebar';
+import { KeymapSettings } from './KeymapSettings';
+import { loadOverrides, saveOverrides } from './keymapStorage';
+import {
+  type KeymapOverride,
+  effectiveKeymap,
+  matchCombo,
+} from './keymap';
 import type { FileNode, GitFileStatus } from './types';
 import './App.css';
 
@@ -34,6 +41,10 @@ function App() {
   const splitContainerRef = useRef<HTMLDivElement>(null);
   const [diffFile, setDiffFile] = useState<string | null>(null);
   const isDraggingRef = useRef(false);
+
+  const [keymapOverrides, setKeymapOverrides] = useState<KeymapOverride>({});
+  const [keymapLoaded, setKeymapLoaded] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
 
   const handleSplitMouseDown = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
@@ -110,6 +121,18 @@ function App() {
     }
     loadState();
   }, []);
+
+  useEffect(() => {
+    loadOverrides().then((o) => {
+      setKeymapOverrides(o);
+      setKeymapLoaded(true);
+    }).catch(() => setKeymapLoaded(true));
+  }, []);
+
+  useEffect(() => {
+    if (!keymapLoaded) return;
+    saveOverrides(keymapOverrides).catch(() => {});
+  }, [keymapOverrides, keymapLoaded]);
 
   // Listen for CWD changes + meta changes from backend
   useEffect(() => {
@@ -204,86 +227,70 @@ function App() {
     setActiveTerminalId(newTerm.id);
   };
 
-  // Global keyboard shortcuts - use capture phase to work even when terminal has focus
+  // Global keyboard shortcuts - capture phase so terminal focus doesn't swallow them
+  const effectiveKeyEntries = useMemo(() => effectiveKeymap(keymapOverrides), [keymapOverrides]);
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Ignore if user is in an input/textarea (except for terminal which captures differently)
+      if (showSettings) return;
       const target = e.target as HTMLElement;
-      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') {
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
         return;
       }
 
-      const isMod = e.metaKey || e.ctrlKey;
-
-      // Only handle modifier key combos - let other keys pass through to terminal/other handlers
-      if (!isMod) {
+      if (!(e.metaKey || e.ctrlKey)) {
         return;
       }
 
-      // Cmd+T: New terminal
-      if (isMod && e.key === 't') {
-        e.preventDefault();
-        addTerminal();
-        return;
-      }
+      for (const entry of effectiveKeyEntries) {
+        if (!matchCombo(e, entry.combo)) continue;
 
-      // Cmd+B: Toggle sidebar
-      if (isMod && e.key === 'b') {
-        e.preventDefault();
-        setSidebarOpen(prev => !prev);
-        return;
-      }
-
-      // Cmd+Q/W/E: Switch sidebar tabs
-      if (isMod && e.key === 'q') {
-        e.preventDefault();
-        setSidebarTab('terminals');
-        return;
-      }
-      if (isMod && e.key === 'w') {
-        e.preventDefault();
-        setSidebarTab('explorer');
-        return;
-      }
-      if (isMod && e.key === 'e') {
-        e.preventDefault();
-        setSidebarTab('git');
-        return;
-      }
-
-      // Cmd+1/2/3: Switch between first 3 terminal sessions
-      if (isMod && e.key === '1' && terminals.length >= 1) {
-        e.preventDefault();
-        setActiveTerminalId(terminals[0].id);
-        return;
-      }
-      if (isMod && e.key === '2' && terminals.length >= 2) {
-        e.preventDefault();
-        setActiveTerminalId(terminals[1].id);
-        return;
-      }
-      if (isMod && e.key === '3' && terminals.length >= 3) {
-        e.preventDefault();
-        setActiveTerminalId(terminals[2].id);
-        return;
-      }
-
-      // Cmd+D: View diff - works even without file open (shows git diff for cwd)
-      if (isMod && e.key === 'd') {
-        e.preventDefault();
-        const cwd = activeTerminalId ? terminalMeta[activeTerminalId]?.cwd : null;
-        if (cwd) {
-          // Toggle between diff view and no diff using the actual cwd path
-          setDiffFile(prev => prev === cwd ? null : cwd);
+        switch (entry.action) {
+          case 'addTerminal':
+            e.preventDefault();
+            addTerminal();
+            break;
+          case 'toggleSidebar':
+            e.preventDefault();
+            setSidebarOpen(prev => !prev);
+            break;
+          case 'focusTerminalsTab':
+            e.preventDefault();
+            setSidebarTab('terminals');
+            break;
+          case 'focusExplorerTab':
+            e.preventDefault();
+            setSidebarTab('explorer');
+            break;
+          case 'focusGitTab':
+            e.preventDefault();
+            setSidebarTab('git');
+            break;
+          case 'focusTerminalN': {
+            const idx = (entry.payload ?? 1) - 1;
+            if (idx >= 0 && idx < terminals.length) {
+              e.preventDefault();
+              setActiveTerminalId(terminals[idx].id);
+            }
+            break;
+          }
+          case 'toggleDiff': {
+            e.preventDefault();
+            const cwd = activeTerminalId ? terminalMeta[activeTerminalId]?.cwd : null;
+            if (cwd) {
+              setDiffFile(prev => prev === cwd ? null : cwd);
+            }
+            break;
+          }
         }
+        e.stopPropagation();
         return;
       }
     };
 
-    // Use capture phase to intercept events before terminal/other elements
     document.addEventListener('keydown', handleKeyDown, true);
     return () => document.removeEventListener('keydown', handleKeyDown, true);
-  }, [terminals, editorFile, activeTerminalId, terminalMeta]);
+  }, [effectiveKeyEntries, terminals, activeTerminalId, terminalMeta, showSettings]);
 
   const removeTerminal = async (id: string) => {
     try {
@@ -360,6 +367,13 @@ function App() {
 
   return (
     <div style={{ display: 'flex', height: '100vh', width: '100vw', backgroundColor: '#1e1e1e' }}>
+      {showSettings && (
+        <KeymapSettings
+          overrides={keymapOverrides}
+          onSave={setKeymapOverrides}
+          onClose={() => setShowSettings(false)}
+        />
+      )}
       <Sidebar
         open={sidebarOpen}
         onToggle={() => setSidebarOpen(prev => !prev)}
@@ -380,6 +394,7 @@ function App() {
         terminalMeta={terminalMeta}
         showHiddenFiles={showHiddenFiles}
         onToggleHiddenFiles={() => setShowHiddenFiles(prev => !prev)}
+        onOpenSettings={() => setShowSettings(true)}
       />
 
       {/* Main Content - unified structure to prevent terminal remounting */}
