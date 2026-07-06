@@ -75,8 +75,7 @@ export function Sidebar({
     <div style={{ width: '250px', backgroundColor: '#181818', borderRight: '1px solid #333', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       {/* Header with toggle */}
       <div style={{ display: 'flex', alignItems: 'center', padding: '12px 12px 8px 12px', color: '#fff', borderBottom: '1px solid #333' }}>
-        <span style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 'bold', flex: 1 }}>
-          <img src="/icon.png" alt="Tux" style={{ width: '20px', height: '20px' }} />
+        <span style={{ display: 'flex', alignItems: 'center', flex: 1, fontWeight: 'bold', fontFamily: '"JetBrains Mono", "SF Mono", Menlo, Monaco, monospace', fontSize: '15px', letterSpacing: '0.5px' }}>
           Tux
         </span>
         {onOpenSettings && (
