@@ -16,6 +16,7 @@ pub fn run() {
       pty::get_pty_cwd,
       pty::get_pty_process_name_cmd,
       pty::get_pty_git_branch,
+      pty::get_pty_current_command,
       fs::read_dir,
       fs::read_dir_tree,
       fs::read_file,

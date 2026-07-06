@@ -13,7 +13,7 @@ import {
   effectiveKeymap,
   matchCombo,
 } from './keymap';
-import type { FileNode, GitFileStatus } from './types';
+import type { FileNode, GitFileStatus, TerminalMeta } from './types';
 import './App.css';
 
 let storeInstance: any = null;
@@ -33,8 +33,8 @@ function App() {
   const [gitStatus, setGitStatus] = useState<Record<string, string>>({});
   const [showHiddenFiles, setShowHiddenFiles] = useState(false);
 
-  // Terminal metadata: { cwd, processName, gitBranch }
-  const [terminalMeta, setTerminalMeta] = useState<Record<string, { cwd: string; processName: string; gitBranch: string | null }>>({});
+  // Terminal metadata: { cwd, processName, gitBranch, currentCommand }
+  const [terminalMeta, setTerminalMeta] = useState<Record<string, TerminalMeta>>({});
 
   // Resizable split: fraction of width for the left (editor) pane
   const [splitRatio, setSplitRatio] = useState(0.5);
@@ -146,7 +146,7 @@ function App() {
         const newCwd = event.payload;
         setTerminalMeta((prev) => ({
           ...prev,
-          [t.id]: { ...prev[t.id], cwd: newCwd, processName: prev[t.id]?.processName ?? 'shell', gitBranch: prev[t.id]?.gitBranch ?? null },
+          [t.id]: { ...prev[t.id], cwd: newCwd, processName: prev[t.id]?.processName ?? 'shell', gitBranch: prev[t.id]?.gitBranch ?? null, currentCommand: prev[t.id]?.currentCommand ?? '' },
         }));
         // If this is the active terminal, update explorer root and tree
         if (t.id === activeTerminalId) {
@@ -177,26 +177,41 @@ function App() {
           ]);
           setTerminalMeta((prev) => ({
             ...prev,
-            [t.id]: { ...prev[t.id], processName: name, gitBranch: branch, cwd: prev[t.id]?.cwd ?? '/Users/user' },
+            [t.id]: { ...prev[t.id], processName: name, gitBranch: branch, cwd: prev[t.id]?.cwd ?? '/Users/user', currentCommand: prev[t.id]?.currentCommand ?? '' },
           }));
         } catch (e) {
           console.error("Failed to fetch meta for", t.id, e);
         }
       });
       unlistens.push(() => { u2.then(u => u()); });
+
+      // Current command changed (shell integration OSC 7999)
+      const u3 = listen(`pty-cmd-changed-${t.id}`, async () => {
+        try {
+          const cmd = await invoke<string>('get_pty_current_command', { id: t.id });
+          setTerminalMeta((prev) => ({
+            ...prev,
+            [t.id]: { cwd: prev[t.id]?.cwd ?? '/Users/user', processName: prev[t.id]?.processName ?? 'shell', gitBranch: prev[t.id]?.gitBranch ?? null, currentCommand: cmd },
+          }));
+        } catch (e) {
+          console.error("Failed to fetch current command for", t.id, e);
+        }
+      });
+      unlistens.push(() => { u3.then(u => u()); });
     });
 
     // Initial meta fetch for existing terminals
     terminals.forEach(async (t) => {
       try {
-        const [cwd, name, branch] = await Promise.all([
+        const [cwd, name, branch, cmd] = await Promise.all([
           invoke<string>('get_pty_cwd', { id: t.id }),
           invoke<string>('get_pty_process_name_cmd', { id: t.id }),
           invoke<null | string>('get_pty_git_branch', { id: t.id }),
+          invoke<string>('get_pty_current_command', { id: t.id }),
         ]);
         setTerminalMeta((prev) => ({
           ...prev,
-          [t.id]: { cwd, processName: name, gitBranch: branch },
+          [t.id]: { cwd, processName: name, gitBranch: branch, currentCommand: cmd },
         }));
         if (t.id === activeTerminalId) {
           setExplorerRoot(cwd);
@@ -481,7 +496,7 @@ function App() {
 
           {/* Terminal pane - always in same position in the tree */}
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, overflow: 'hidden' }}>
-            {terminals.map(t => (
+            {terminals.map((t, idx) => (
               <div
                 key={t.id}
                 style={{
@@ -493,7 +508,7 @@ function App() {
                   overflow: 'hidden',
                 }}
               >
-                <TerminalHeader id={t.id} onRemove={removeTerminal} meta={terminalMeta[t.id]} />
+                <TerminalHeader id={t.id} index={idx} onRemove={removeTerminal} meta={terminalMeta[t.id]} />
                 <div style={{ flex: 1, position: 'relative', minHeight: 0, overflow: 'hidden' }}>
                   <TerminalPane id={t.id} isVisible={t.id === activeTerminalId} />
                 </div>
@@ -507,12 +522,26 @@ function App() {
 }
 
 // Terminal header with contextual name
-function TerminalHeader({ id, onRemove, meta }: { id: string; onRemove: (id: string) => void; meta?: { processName: string; gitBranch: string | null } }) {
-  const displayName = meta ? (meta.gitBranch ? `${meta.processName} · ${meta.gitBranch}` : meta.processName) : `Terminal ${id.slice(-4)}`;
+function TerminalHeader({ id, index, onRemove, meta }: { id: string; index: number; onRemove: (id: string) => void; meta?: TerminalMeta }) {
+  let displayName: string;
+  if (meta?.currentCommand) {
+    const cmd = meta.currentCommand.length > 40
+      ? meta.currentCommand.slice(0, 40) + '…'
+      : meta.currentCommand;
+    displayName = meta.gitBranch ? `${cmd} · ${meta.gitBranch}` : cmd;
+  } else if (meta) {
+    displayName = meta.gitBranch ? `${meta.processName} · ${meta.gitBranch}` : meta.processName;
+  } else {
+    displayName = `Terminal ${index + 1}`;
+  }
+  const running = !!meta?.currentCommand;
 
   return (
     <div style={{ height: '30px', backgroundColor: '#252526', borderBottom: '1px solid #333', display: 'flex', alignItems: 'center', padding: '0 10px', fontSize: '12px', color: '#888', gap: '8px' }}>
-      <span>{displayName}</span>
+      {running && (
+        <span style={{ display: 'inline-block', width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#f5a623', flexShrink: 0 }} title="Command running" />
+      )}
+      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{displayName}</span>
       <button onClick={() => onRemove(id)} style={{ marginLeft: 'auto', cursor: 'pointer', background: 'transparent', border: 'none', color: '#888', fontSize: '14px' }}>×</button>
     </div>
   );

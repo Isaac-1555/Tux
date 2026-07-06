@@ -1,7 +1,7 @@
 import { Monitor, Folder, GitBranch, Menu, Eye, EyeOff, X, Settings } from 'lucide-react';
 import { FileTree } from './FileTree';
 import { GitViewer } from './GitViewer';
-import type { FileNode } from './types';
+import type { FileNode, TerminalMeta } from './types';
 
 interface SidebarProps {
   open: boolean;
@@ -20,7 +20,7 @@ interface SidebarProps {
   onToggleFolder: (path: string) => void;
   onFileClick: (path: string) => void;
   gitStatus: Record<string, string>;
-  terminalMeta: Record<string, { cwd: string; processName: string; gitBranch: string | null }>;
+  terminalMeta: Record<string, TerminalMeta>;
   showHiddenFiles: boolean;
   onToggleHiddenFiles: () => void;
   onOpenSettings?: () => void;
@@ -48,12 +48,18 @@ export function Sidebar({
   onToggleHiddenFiles,
   onOpenSettings,
 }: SidebarProps) {
-  const getTerminalDisplayName = (id: string): string => {
+  const getTerminalDisplayName = (id: string, index: number): string => {
     const meta = terminalMeta[id];
+    if (meta?.currentCommand) {
+      const truncated = meta.currentCommand.length > 40
+        ? meta.currentCommand.slice(0, 40) + '…'
+        : meta.currentCommand;
+      return meta.gitBranch ? `${truncated} · ${meta.gitBranch}` : truncated;
+    }
     if (meta) {
       return meta.gitBranch ? `${meta.processName} · ${meta.gitBranch}` : meta.processName;
     }
-    return `Terminal ${id.slice(-4)}`;
+    return `Terminal ${index + 1}`;
   };
 
   if (!open) {
@@ -122,7 +128,7 @@ export function Sidebar({
         {activeTab === 'terminals' && (
           <div style={{ padding: '10px' }}>
             <div style={{ fontSize: '11px', textTransform: 'uppercase', color: '#666', marginBottom: '8px', letterSpacing: '0.5px' }}>Sessions</div>
-            {terminals.map(t => (
+            {terminals.map((t, idx) => (
               <div
                 key={t.id}
                 onClick={() => onTerminalSelect(t.id)}
@@ -143,7 +149,7 @@ export function Sidebar({
                 <span style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden' }}>
                   <Monitor size={14} />
                   <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {getTerminalDisplayName(t.id)}
+                    {getTerminalDisplayName(t.id, idx)}
                   </span>
                 </span>
                 <button

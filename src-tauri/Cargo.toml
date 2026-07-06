@@ -28,3 +28,4 @@ tokio = { version = "1.52.2", features = ["full"] }
 tauri-plugin-shell = "2.3.5"
 tauri-plugin-store = "2.4.3"
 git2 = "0.20.4"
+tempfile = "3"

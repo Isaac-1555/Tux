@@ -32,3 +32,10 @@ export type GitBranch = {
 export type TerminalSession = {
   id: string;
 };
+
+export type TerminalMeta = {
+  cwd: string;
+  processName: string;
+  gitBranch: string | null;
+  currentCommand: string;
+};
