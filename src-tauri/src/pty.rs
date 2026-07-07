@@ -381,18 +381,25 @@ pub fn spawn_pty(id: String, rows: u16, cols: u16, app_handle: AppHandle) -> Res
     cmd.env("LANG", &utf8_locale);
     cmd.env("LC_CTYPE", &utf8_locale);
 
-    // Inject shell integration.
+    // Inject shell integration. Spawn as a login shell so the system
+    // profile files (/etc/zprofile, /etc/profile) run, which on macOS is
+    // what calls `path_helper` to add /etc/paths.d/* entries (Homebrew,
+    // user-installed tools) to PATH. Without -l, the PTY inherits only
+    // the parent process's minimal PATH and tools like `opencode` (in
+    // /usr/local/bin) are not found.
     match shell_kind {
         ShellKind::Bash => {
             if let Some(f) = init.file.as_ref() {
                 cmd.arg("--rcfile");
                 cmd.arg(f.path().to_string_lossy().to_string());
             }
+            cmd.arg("-l");
         }
         ShellKind::Zsh => {
             if let Some(p) = init.zsh_dir_path.as_ref() {
                 cmd.env("ZDOTDIR", p.to_string_lossy().to_string());
             }
+            cmd.arg("-l");
         }
         ShellKind::Fish => {
             if let Some(f) = init.file.as_ref() {
@@ -400,16 +407,24 @@ pub fn spawn_pty(id: String, rows: u16, cols: u16, app_handle: AppHandle) -> Res
                 let path = f.path().to_string_lossy();
                 cmd.arg(format!("source \"{}\"", path));
             }
+            cmd.arg("-l");
         }
         ShellKind::Pwsh => {
             if let Some(f) = init.file.as_ref() {
                 cmd.arg("-NoExit");
+                cmd.arg("-Login");
                 let path = f.path().to_string_lossy();
                 cmd.arg("-Command");
                 cmd.arg(format!(". \"{}\"", path));
             }
         }
-        ShellKind::Other => {}
+        ShellKind::Other => {
+            let lower = shell_name.to_ascii_lowercase();
+            let base = lower.rsplit('/').next().unwrap_or(&lower);
+            if matches!(base, "sh" | "bash" | "zsh" | "fish") {
+                cmd.arg("-l");
+            }
+        }
     }
 
     let child = pair.slave.spawn_command(cmd).map_err(|e| e.to_string())?;
