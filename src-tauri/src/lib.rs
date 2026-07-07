@@ -8,6 +8,7 @@ pub fn run() {
     .manage(pty::PtyState::new())
     .plugin(tauri_plugin_store::Builder::new().build())
     .plugin(tauri_plugin_shell::init())
+    .plugin(tauri_plugin_window_state::Builder::default().build())
     .invoke_handler(tauri::generate_handler![
       pty::spawn_pty,
       pty::write_pty,
