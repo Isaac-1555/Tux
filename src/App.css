@@ -2,6 +2,16 @@
   box-sizing: border-box;
 }
 
+button {
+  transition: outline-color 0.1s ease;
+}
+
+button:not(:disabled):hover,
+button:not(:disabled):focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: 1px;
+}
+
 :root {
   /* Defaults = Tux Dark (overridden at runtime by applyTheme) */
   --bg-app: #1e1e1e;
@@ -38,6 +48,10 @@
   --term-selection: rgba(88, 101, 242, 0.4);
   --btn-primary: #0e639c;
   --btn-primary-hover: #1177bb;
+  /* Derived legibility tokens (set at runtime by applyTheme) */
+  --on-accent: #ffffff;
+  --on-danger: #ffffff;
+  --accent-text: #7c86ff;
 
   --diff-background-color: var(--bg-app);
   --diff-text-color: var(--fg);

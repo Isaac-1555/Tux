@@ -138,7 +138,7 @@ export function Sidebar({
                   marginBottom: '4px',
                   borderRadius: '4px',
                   backgroundColor: t.id === activeTerminalId ? 'var(--accent)' : 'var(--bg-elevated)',
-                  color: 'var(--fg)',
+                  color: t.id === activeTerminalId ? 'var(--on-accent)' : 'var(--fg)',
                   fontSize: '13px',
                   cursor: 'pointer',
                   display: 'flex',
@@ -157,13 +157,13 @@ export function Sidebar({
                   <button
                     onClick={(e) => { e.stopPropagation(); onAddTerminalInCwd(terminalMeta[t.id]?.cwd); }}
                     title="New terminal in this directory"
-                    style={{ background: 'transparent', border: 'none', color: 'var(--fg-muted)', cursor: 'pointer', padding: '2px', display: 'flex', borderRadius: '2px' }}
+                    style={{ background: 'transparent', border: 'none', color: t.id === activeTerminalId ? 'var(--on-accent)' : 'var(--fg-muted)', cursor: 'pointer', padding: '2px', display: 'flex', borderRadius: '2px' }}
                   >
                     <Plus size={14} />
                   </button>
                   <button
                     onClick={(e) => { e.stopPropagation(); onRemoveTerminal(t.id); }}
-                    style={{ background: 'transparent', border: 'none', color: 'var(--fg-muted)', cursor: 'pointer', padding: '2px', display: 'flex', borderRadius: '2px' }}
+                    style={{ background: 'transparent', border: 'none', color: t.id === activeTerminalId ? 'var(--on-accent)' : 'var(--fg-muted)', cursor: 'pointer', padding: '2px', display: 'flex', borderRadius: '2px' }}
                   >
                     <X size={14} />
                   </button>

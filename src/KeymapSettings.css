@@ -160,7 +160,7 @@
 .km-btn-danger {
   background: var(--danger);
   border-color: var(--danger);
-  color: #fff;
+  color: var(--on-danger);
 }
 
 .km-btn-danger:hover {

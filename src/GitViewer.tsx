@@ -86,8 +86,8 @@ export function GitViewer({ path }: GitViewerProps) {
             onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'var(--bg-elevated)'; }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
-              <GitCommitIcon size={14} color="var(--accent)" />
-              <span style={{ color: 'var(--accent)', fontSize: '11px', fontFamily: 'monospace' }}>{c.short_hash}</span>
+              <GitCommitIcon size={14} color="var(--accent-text)" />
+              <span style={{ color: 'var(--accent-text)', fontSize: '11px', fontFamily: 'monospace' }}>{c.short_hash}</span>
             </div>
             <div style={{ color: 'var(--fg)', fontSize: '12px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: '2px' }}>
               {c.message}

@@ -15,7 +15,9 @@ import {
   cloneColors,
   normalizeHex,
   toCssHex,
+  guardTheme,
 } from './theme';
+import { ThemePreview } from './ThemePreview';
 import './ThemeSettings.css';
 
 type Props = {
@@ -100,14 +102,7 @@ export function ThemeSettings({ state, onChange }: Props) {
                 className={`th-preset${active ? ' active' : ''}`}
                 onClick={() => selectPreset(p.id)}
               >
-                <div className="th-swatch" aria-hidden>
-                  <span style={{ background: p.colors.bgApp }} />
-                  <span style={{ background: p.colors.bgSidebar }} />
-                  <span style={{ background: p.colors.accent }} />
-                  <span style={{ background: p.colors.green }} />
-                  <span style={{ background: p.colors.red }} />
-                  <span style={{ background: p.colors.fg }} />
-                </div>
+                <ThemePreview colors={guardTheme(p.colors)} />
                 <div className="th-preset-meta">
                   <span className="th-preset-name">{p.name}</span>
                   <span className="th-preset-mode">{p.mode}</span>
@@ -125,14 +120,7 @@ export function ThemeSettings({ state, onChange }: Props) {
               });
             }}
           >
-            <div className="th-swatch" aria-hidden>
-              <span style={{ background: colors.bgApp }} />
-              <span style={{ background: colors.bgSidebar }} />
-              <span style={{ background: colors.accent }} />
-              <span style={{ background: colors.green }} />
-              <span style={{ background: colors.red }} />
-              <span style={{ background: colors.fg }} />
-            </div>
+            <ThemePreview colors={guardTheme(colors)} />
             <div className="th-preset-meta">
               <span className="th-preset-name">Custom</span>
               <span className="th-preset-mode">edit below</span>

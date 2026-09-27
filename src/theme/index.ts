@@ -18,5 +18,6 @@ export { applyTheme } from './apply';
 export { toXtermTheme } from './xtermTheme';
 export { toCodeMirrorTheme } from './codemirrorTheme';
 export { resolveColors, resolveMode, cloneColors } from './resolve';
+export { guardTheme, ensureContrast, deriveUiColors, contrastRatio } from './contrast';
 export { loadTheme, saveTheme } from './themeStorage';
 export { normalizeHex, withAlpha, toCssHex } from './utils';

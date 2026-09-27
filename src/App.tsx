@@ -20,6 +20,7 @@ import {
   loadTheme,
   saveTheme,
   resolveColors,
+  guardTheme,
 } from './theme';
 import type { FileNode, GitFileStatus, TerminalMeta } from './types';
 import './App.css';
@@ -63,6 +64,7 @@ function App() {
   });
   const [themeLoaded, setThemeLoaded] = useState(false);
   const themeColors = useMemo(() => resolveColors(themeState), [themeState]);
+  const displayColors = useMemo(() => guardTheme(themeColors), [themeColors]);
 
   const handleSplitMouseDown = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
@@ -168,19 +170,19 @@ function App() {
     loadTheme()
       .then((s) => {
         setThemeState(s);
-        applyTheme(resolveColors(s));
+        applyTheme(guardTheme(resolveColors(s)));
         setThemeLoaded(true);
       })
       .catch(() => {
-        applyTheme(resolveColors({ activeId: DEFAULT_THEME_ID, custom: null }));
+        applyTheme(guardTheme(resolveColors({ activeId: DEFAULT_THEME_ID, custom: null })));
         setThemeLoaded(true);
       });
   }, []);
 
   useEffect(() => {
     if (!themeLoaded) return;
-    applyTheme(themeColors);
-  }, [themeColors, themeLoaded]);
+    applyTheme(displayColors);
+  }, [displayColors, themeLoaded]);
 
   useEffect(() => {
     if (!themeLoaded) return;
@@ -513,7 +515,7 @@ function App() {
             transition: 'width 0.1s ease',
           }}>
             {editorFile ? (
-              <EditorPane filePath={editorFile} onClose={closeEditor} colors={themeColors} />
+              <EditorPane filePath={editorFile} onClose={closeEditor} colors={displayColors} />
             ) : diffFile ? (
               <DiffPane filePath={diffFile} onClose={closeDiff} />
             ) : null}
@@ -597,7 +599,7 @@ function App() {
               >
                 <TerminalHeader id={t.id} index={idx} onRemove={removeTerminal} meta={terminalMeta[t.id]} />
                 <div style={{ flex: 1, position: 'relative', minHeight: 0, overflow: 'hidden' }}>
-                  <TerminalPane id={t.id} isVisible={t.id === activeTerminalId} colors={themeColors} initialCwd={pendingCwd[t.id]} />
+                  <TerminalPane id={t.id} isVisible={t.id === activeTerminalId} colors={displayColors} initialCwd={pendingCwd[t.id]} />
                 </div>
               </div>
             ))}

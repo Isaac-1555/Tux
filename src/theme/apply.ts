@@ -1,5 +1,6 @@
 import type { ThemeColors } from './types';
 import { withAlpha } from './utils';
+import { deriveUiColors } from './contrast';
 
 const VAR_MAP: Record<keyof ThemeColors, string> = {
   bgApp: '--bg-app',
@@ -70,6 +71,12 @@ export function applyTheme(colors: ThemeColors): void {
   for (const [key, cssVar] of Object.entries(VAR_MAP) as [keyof ThemeColors, string][]) {
     root.style.setProperty(cssVar, colors[key]);
   }
+
+  // Legibility-derived foregrounds for text/icons sitting on accent or danger.
+  const derived = deriveUiColors(colors);
+  root.style.setProperty('--on-accent', derived.onAccent);
+  root.style.setProperty('--on-danger', derived.onDanger);
+  root.style.setProperty('--accent-text', derived.accentText);
 
   // Bridge existing --diff-* library vars
   root.style.setProperty('--diff-background-color', colors.bgApp);
