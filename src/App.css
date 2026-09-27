@@ -2,13 +2,12 @@
   box-sizing: border-box;
 }
 
-button {
-  transition: outline-color 0.1s ease;
-}
-
+/* Hover ring uses the button's own text color (contrast-guarded per context)
+   so it never blends into the surface behind it — e.g. an accent-colored
+   active row where an accent-colored ring would vanish. */
 button:not(:disabled):hover,
 button:not(:disabled):focus-visible {
-  outline: 1px solid var(--accent);
+  outline: 1px solid currentColor;
   outline-offset: 1px;
 }
 
