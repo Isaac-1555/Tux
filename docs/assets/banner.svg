@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="340" viewBox="0 0 1280 340" role="img" aria-label="Tux — terminal-first desktop workspace">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#141416"/>
+      <stop offset="1" stop-color="#0b0b0d"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#77bb41"/>
+      <stop offset="1" stop-color="#4ec9b0"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1280" height="340" rx="18" fill="url(#bg)"/>
+  <rect x="0.5" y="0.5" width="1279" height="339" rx="18" fill="none" stroke="#2a2a2a"/>
+
+  <text x="80" y="150" font-family="Menlo, Monaco, 'SF Mono', monospace" font-size="96" font-weight="700" fill="#ffffff" letter-spacing="2">Tux</text>
+  <rect x="82" y="172" width="150" height="5" rx="2.5" fill="url(#accent)"/>
+
+  <text x="80" y="222" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="24" fill="#c8c8c8">Terminal-first desktop workspace.</text>
+  <text x="80" y="258" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="20" fill="#8a8a8a">Multi-session PTYs · editor · git · themes</text>
+
+  <g transform="translate(820 70)">
+    <rect width="380" height="200" rx="12" fill="#0e0e10" stroke="#2a2a2a"/>
+    <circle cx="24" cy="24" r="6" fill="#ff5f56"/>
+    <circle cx="44" cy="24" r="6" fill="#ffbd2e"/>
+    <circle cx="64" cy="24" r="6" fill="#27c93f"/>
+    <line x1="0" y1="42" x2="380" y2="42" stroke="#2a2a2a"/>
+    <text x="22" y="76" font-family="Menlo, Monaco, monospace" font-size="15" fill="#77bb41">➜</text>
+    <text x="44" y="76" font-family="Menlo, Monaco, monospace" font-size="15" fill="#d4d4d4">~/dev/tux</text>
+    <text x="22" y="104" font-family="Menlo, Monaco, monospace" font-size="15" fill="#569cd6">$</text>
+    <text x="42" y="104" font-family="Menlo, Monaco, monospace" font-size="15" fill="#e0e0e0">npm run tauri dev</text>
+    <text x="22" y="132" font-family="Menlo, Monaco, monospace" font-size="15" fill="#4ec9b0">✓ compiled · hot-reload</text>
+    <text x="22" y="160" font-family="Menlo, Monaco, monospace" font-size="15" fill="#6a9955"># zsh · main</text>
+    <rect x="22" y="176" width="9" height="16" fill="#77bb41"/>
+  </g>
+</svg>
